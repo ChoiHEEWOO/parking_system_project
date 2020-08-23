@@ -49,9 +49,6 @@ char mfrc_serial_data_receive(void);
  #define RECEIVE_SUCC 1
  #define RECEIVE_FAIL -1
  //===========================수신 여부 리턴==========================//
-
-
-
 //about buzzer
 void setSoundClip(char clip);
 void buzz_play();
@@ -61,10 +58,11 @@ void setSoundNote(int note);
 ISR(TIMER0_COMP_vect) // 1khz 속도로 ISR 진입
 {
 	//dummy code to check 
-	PORTA ^=0x02;
+	//PORTA ^=0x02;
+	
 // 	static u32 ticks=0;
 // 	ticks++;
-// 	if(ticks%10==0){//1khz마다 증가
+// 	if(ticks%10==0){//0.1khz마다 증가
 	TICK.buzz_1ms++;
 	buzz_play();
 }
@@ -81,7 +79,7 @@ int main(void)
 {
     /* Replace with your application code */
 	sei();
-	DDRA|=0x03;
+	DDRA|=0x03; //test Port
 	
 	
 	//사용하는 기능들 초기화 작업
@@ -92,12 +90,12 @@ int main(void)
 	uart_init(1,9600);//esp8266() : Rx:PD2, Tx:PD3
 	
 	mfrc522_version_check();
-	//mfrc522_IRQ_enable();
+	mfrc522_IRQ_enable();
 	
-	byte=mfrc522_read(ComIEnReg);
-	mfrc522_write(ComIEnReg,byte|0x20); //RxInterrupt Enable
-	byte=mfrc522_read(DivIEnReg);
-	mfrc522_write(DivIEnReg,byte|0x80); //IRQPushPull
+// 	byte=mfrc522_read(ComIEnReg);
+// 	mfrc522_write(ComIEnReg,byte|0x20); //RxInterrupt Enable
+// 	byte=mfrc522_read(DivIEnReg);
+// 	mfrc522_write(DivIEnReg,byte|0x80); //IRQPushPull
 	cli();
 	setSoundClip(BUZZ_SUCCESS);
 	timer0_init();
