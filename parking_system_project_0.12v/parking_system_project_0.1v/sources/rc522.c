@@ -243,8 +243,8 @@ unsigned char mfrc522_to_card(unsigned char cmd, unsigned char *send_data, unsig
 		
 	}
 	
-	//SetBitMask(ControlReg,0x80);           //timer stops
-	//mfrc522_write(cmdReg, PCD_IDLE);
+// 	SetBitMask(ControlReg,0x80);           //timer stops
+ //mfrc522_write(CommandReg, MFRC522_CMD_Idle);
 
 	return status;
 }

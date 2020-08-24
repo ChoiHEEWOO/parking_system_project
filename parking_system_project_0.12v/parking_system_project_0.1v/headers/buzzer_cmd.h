@@ -36,8 +36,9 @@
 /**setSoundClip 아래 효과음 리스트 추가 요망*/
 
 #define BUZZ_MUTE 0x00 //
-#define BUZZ_SUCCESS 0x01
-#define BUZZ_FAIL 0x02 //인식 실패 시 :: 삐~~-삐~~-삐~~
+#define BUZZ_ON 0x01
+#define BUZZ_SUCCESS 0x02
+#define BUZZ_FAIL 0x03 //인식 실패 시 :: 삐~~-삐~~-삐~~
 
 // #define BUZZ_BEEP 0x01 //인식 시 삐빕
 // #define BUZZ_POWERON 0x03 //처음 전원 인가 후 로딩 중
