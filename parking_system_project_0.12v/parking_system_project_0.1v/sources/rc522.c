@@ -161,7 +161,8 @@ unsigned char mfrc522_to_card(unsigned char cmd, unsigned char *send_data, unsig
 		break;
 	}
 	
-	//mfrc522_write(ComIEnReg, irqEn|0x80);	//Interrupt request
+	///////////////////////////////////////////============여기-==========//////////
+	mfrc522_write(ComIEnReg, irqEn|0x80);	//Interrupt request 원래 주석으로 달려있었떤 곳임.
 	n=mfrc522_read(ComIrqReg);
 	mfrc522_write(ComIrqReg,n&(~0x80));//clear all interrupt bits
 	n=mfrc522_read(FIFOLevelReg);

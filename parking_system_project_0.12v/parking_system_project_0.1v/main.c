@@ -154,10 +154,15 @@ int main(void)
 }
 
 char mfrc_check_and_data_receive(void){ 
-	//하... 이 복병을 해결하는 방법은 detect_flag를 다른 곳에서 돌아오도록 처리해주는 방법밖에 안떠오른다. ㅅㅂ
-	byte = mfrc522_request(PICC_REQALL,rfid_uid);//
-	//byte=mfrc522_get_card_serial(rfid_uid);
-	//인식 시키고 있을 때 oxoxoxoxox ㅇㅈㄹ한다.
+	//하... 이 복병을 해결하는 방법은 detect_flag를 다른 곳에서 돌아오도록 처리해주는 방법밖에 안떠오른다. 기모띵 
+	
+	//원인 모를 버그를 해결하기 위한 용도로 쓰는 flag : 카드 인식 request 시, return 할 때 oxoxoxoxox이짓거리 하는 버그 발생	
+	static char noise_flag=0;
+	
+	if(noise_flag==0)byte = mfrc522_request(PICC_REQALL,rfid_uid);
+	else mfrc522_request(PICC_REQALL,rfid_uid);
+	
+	//인식 시키고 있을 때 oxoxoxoxox ㅇㅈㄹ한다. 하하하하하하하
 	
 	//dummy code
 // 	if(byte==CARD_FOUND)uart0_tx_char('O');
@@ -173,10 +178,9 @@ char mfrc_check_and_data_receive(void){
 	else if((byte==CARD_FOUND)&&(detected_flag==NON_DETECTED)) //카드를 계속 대고 있다면, 첫 순간만 인정
 	{
 		detected_flag=DETECED;
+		noise_flag=1;
+		
 		byte=mfrc522_get_card_serial(rfid_uid);
-// 		 	if(byte==CARD_FOUND)uart0_tx_char('O');
-// 		 	else if(byte==CARD_NOT_FOUND)uart0_tx_char('N');
-// 		 	else if(byte==ERROR)uart0_tx_char('X');
 		if(byte==CARD_FOUND){
 			//
 			//dummy code
