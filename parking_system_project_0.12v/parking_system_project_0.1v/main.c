@@ -57,7 +57,7 @@ char mfrc_check_and_data_receive(void); //여기선 카드 인식 자체의 성�
 
  //===========================수신 여부 리턴==========================//
  #define RECEIVE_NONE 0
- #define RECEIVE_SUCC 1
+ #define RECEIVE_SUCCESS 1
  #define RECEIVE_FAIL -1
  //===========================수신 여부 리턴==========================//
 //about buzzer
@@ -133,7 +133,7 @@ int main(void)
 		//PORTA^=0x01;
 		char received_state = mfrc_check_and_data_receive(); 
 		if(received_state==RECEIVE_NONE);
-		else if(received_state==RECEIVE_SUCC){//받은 데이터 처리 루틴
+		else if(received_state==RECEIVE_SUCCESS){//받은 데이터 처리 루틴
 			//esp8266 전송
 			/*
 			if(esp수신데이터)
@@ -158,16 +158,30 @@ char mfrc_check_and_data_receive(void){
 	
 	//원인 모를 버그를 해결하기 위한 용도로 쓰는 flag : 카드 인식 request 시, return 할 때 oxoxoxoxox이짓거리 하는 버그 발생	
 	static char noise_flag=0;
+	static char toggle_flag=0;
 	
-	if(noise_flag==0)byte = mfrc522_request(PICC_REQALL,rfid_uid);
-	else mfrc522_request(PICC_REQALL,rfid_uid);
+	if(noise_flag==0){ //CARD_FOUND로 리턴될 떄
+		byte = mfrc522_request(PICC_REQALL,rfid_uid);
+	}
+	else { //인식 성공 이후 인식(ERROR로 리턴될 때) 
+		
+		
+		if(toggle_flag) mfrc522_request(PICC_REQALL,rfid_uid); //이상한 데이터 가져올 때
+		else{ //정상적인 데이터 가져올 때
+			byte=mfrc522_request(PICC_REQALL,rfid_uid);
+			if(byte==ERROR) noise_flag=0;
+		}
+			
+		toggle_flag^=0x01;
+	}
+	//인식 시키고 있을 때 oxoxoxoxox한다. 하아.................................................으아아아 >> 예외처리함.
 	
-	//인식 시키고 있을 때 oxoxoxoxox ㅇㅈㄹ한다. 하하하하하하하
-	
-	//dummy code
+	/*dummy code///////////////////////////////////////*/
 // 	if(byte==CARD_FOUND)uart0_tx_char('O');
 // 	else if(byte==CARD_NOT_FOUND)uart0_tx_char('N');
 // 	else if(byte==ERROR)uart0_tx_char('X');
+	///////////////////////////////////////////////////
+	
 	
 	if(byte!=CARD_FOUND) //카드 인식이 안되어 있는 경우
 	{
@@ -178,32 +192,42 @@ char mfrc_check_and_data_receive(void){
 	else if((byte==CARD_FOUND)&&(detected_flag==NON_DETECTED)) //카드를 계속 대고 있다면, 첫 순간만 인정
 	{
 		detected_flag=DETECED;
-		noise_flag=1;
-		
+		noise_flag=1; //얘가 첫 순간임.
+		toggle_flag=1;
 		byte=mfrc522_get_card_serial(rfid_uid);
 		if(byte==CARD_FOUND){
+			
+		/*dummy code///////////////////////////////////////*/
+// 		if(byte==CARD_FOUND)uart0_tx_char('O');
+// 		else if(byte==CARD_NOT_FOUND)uart0_tx_char('N');
+// 		else if(byte==ERROR)uart0_tx_char('X');
+	///////////////////////////////////////////////////
+
 			//
 			//dummy code
 			//setSoundClip(BUZZ_SUCCESS);
-// 			uart0_tx_string("[CHECK UID]: ");
-// 			mfrc_print_serial(ASCII_TYPE);
-// 			mfrc_print_serial(DECIMAL_TYPE);
-// 			mfrc_print_serial(HEXDECIMAL_TYPE);
-// 			uart0_tx_char('\n');
+			uart0_tx_string("[CHECK UID]: ");
+			mfrc_print_serial(ASCII_TYPE);
+			mfrc_print_serial(DECIMAL_TYPE);
+			mfrc_print_serial(HEXDECIMAL_TYPE);
+			uart0_tx_char('\n');
 			//////////////////////////
 			
-			return RECEIVE_SUCC;
+			return RECEIVE_SUCCESS;
 		}
 		else {
 			//dummy code
-			setSoundClip(BUZZ_FAIL);
+			//setSoundClip(BUZZ_FAIL);
 			uart0_tx_string("\nerror\n");
 			////////////////////////////
 			
 			return RECEIVE_FAIL;
 		}
 	}
-	else return RECEIVE_NONE; //카드를 계속 대고 있을 때 (byte==CARD_FOUND && detected_flag==1)
+	else {  //카드를 계속 대고 있을 때 (byte==CARD_FOUND && detected_flag==1)
+		
+		return RECEIVE_NONE;
+	}
 	
 
 }
