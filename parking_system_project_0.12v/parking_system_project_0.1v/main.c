@@ -37,6 +37,7 @@ typedef uint32_t u8;
 unsigned char byte;
 unsigned char detected_flag='X';
 uint8_t rfid_uid[MAX_LEN];
+char received_state;
  //===========================RFID 입력 flag==========================//
  #define DETECED 'O'
  #define NON_DETECTED 'X'
@@ -122,7 +123,7 @@ int main(void)
 // 		//전원 켜지는 소리
 // 	}
 	
-	
+
 	//main loop start.
     while (1) 
     {//절대 루프 안에 delay가 길게 걸리면 않도록 주의해야 함.
@@ -131,10 +132,12 @@ int main(void)
 		_delay_ms(100);
 		//uart0_tx_string(send_SSID_TEST(SSID,PASSWORD)); //31ms나 소요됨.
 		//PORTA^=0x01;
-		char received_state = mfrc_check_and_data_receive(); 
-		if(received_state==RECEIVE_NONE);
-		else if(received_state==RECEIVE_SUCCESS){//받은 데이터 처리 루틴
-			//esp8266 전송
+		
+		if(TICK.tick_1ms % 100 ==0) received_state = mfrc_check_and_data_receive(); //RFID check and receive UID data per 100ms
+		
+		if(received_state==RECEIVE_NONE); //do nothing
+		else if(received_state==RECEIVE_SUCCESS){//Received data service routine.
+			//send to esp8266 and receive result data.
 			/*
 			if(esp수신데이터)
 			else if(esp 수신 데이터)
@@ -174,7 +177,6 @@ char mfrc_check_and_data_receive(void){
 			
 		toggle_flag^=0x01;
 	}
-	//인식 시키고 있을 때 oxoxoxoxox한다. 하아.................................................으아아아 >> 예외처리함.
 	
 	/*dummy code///////////////////////////////////////*/
 // 	if(byte==CARD_FOUND)uart0_tx_char('O');
@@ -195,7 +197,7 @@ char mfrc_check_and_data_receive(void){
 		noise_flag=1; //얘가 첫 순간임.
 		toggle_flag=1;
 		byte=mfrc522_get_card_serial(rfid_uid);
-		if(byte==CARD_FOUND){
+		if(byte==CARD_FOUND){//카드가 인식됐을 때 
 			
 		/*dummy code///////////////////////////////////////*/
 // 		if(byte==CARD_FOUND)uart0_tx_char('O');
@@ -206,19 +208,18 @@ char mfrc_check_and_data_receive(void){
 			//
 			//dummy code
 			//setSoundClip(BUZZ_SUCCESS);
-			uart0_tx_string("[CHECK UID]: ");
-			mfrc_print_serial(ASCII_TYPE);
-			mfrc_print_serial(DECIMAL_TYPE);
-			mfrc_print_serial(HEXDECIMAL_TYPE);
-			uart0_tx_char('\n');
+// 			uart0_tx_string("[CHECK UID]: ");
+// 			mfrc_print_serial(ASCII_TYPE);
+// 			mfrc_print_serial(DECIMAL_TYPE);
+// 			mfrc_print_serial(HEXDECIMAL_TYPE);
+// 			uart0_tx_char('\n');
 			//////////////////////////
 			
 			return RECEIVE_SUCCESS;
 		}
-		else {
-			//dummy code
-			//setSoundClip(BUZZ_FAIL);
-			uart0_tx_string("\nerror\n");
+		else {//카드는 인식됐지만 식별되지 않았을 때 
+			//dummy code////////////////
+			//uart0_tx_string("\nerror\n");
 			////////////////////////////
 			
 			return RECEIVE_FAIL;
