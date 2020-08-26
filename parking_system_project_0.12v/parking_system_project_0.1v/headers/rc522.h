@@ -9,6 +9,9 @@
 
 #define SS_DDR	DDRC
 #define SS_PORT PORTC 
+#define CH0 0
+#define CH1 1
+
 #define		_MFRC_SPI_MSBFIRST		 1
 #define		_MFRC_SPI_MODE0			 0		
 
@@ -123,12 +126,12 @@
 
 
 
-void mfrc522_init();
-void mfrc522_write(unsigned char reg, unsigned char value);
-unsigned char mfrc522_read(unsigned char reg);
-void mfrc522_reset();
-void mfrc522_version_check();
-void mfrc522_IRQ_enable();
-unsigned char mfrc522_request(unsigned char req_mode, unsigned char * tag_type);
-unsigned char mfrc522_to_card(unsigned char cmd, unsigned char *send_data, unsigned char send_data_len, unsigned char *back_data, uint32_t *back_data_len);
-unsigned char mfrc522_get_card_serial(unsigned char * serial_out);
+void mfrc522_init(unsigned char ch);
+void mfrc522_write(unsigned char reg, unsigned char value,unsigned char channel);
+unsigned char mfrc522_read(unsigned char reg, unsigned char channel);
+void mfrc522_reset(unsigned char ch);
+void mfrc522_version_check(unsigned char ch);
+void mfrc522_IRQ_enable(unsigned char ch);
+unsigned char mfrc522_request(unsigned char req_mode, unsigned char * tag_type,unsigned char ch);
+unsigned char mfrc522_to_card(unsigned char cmd, unsigned char *send_data, unsigned char send_data_len, unsigned char *back_data, uint32_t *back_data_len,unsigned char ch);
+unsigned char mfrc522_get_card_serial(unsigned char * serial_out,unsigned char ch);

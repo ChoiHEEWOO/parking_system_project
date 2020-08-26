@@ -21,7 +21,6 @@
 
 
 typedef uint32_t u32;
-
 typedef uint32_t u8;
 
  struct{
@@ -35,8 +34,10 @@ typedef uint32_t u8;
  
  //RFID 관련.
 unsigned char byte;
-unsigned char detected_flag='X';
-uint8_t rfid_uid[MAX_LEN];
+unsigned char detected_flag_ch0='X';
+unsigned char detected_flag_ch1='X';
+uint8_t rfid_uid_ch0[MAX_LEN];
+uint8_t rfid_uid_ch1[MAX_LEN];
 char received_state;
  //===========================RFID 입력 flag==========================//
  #define DETECED 'O'
@@ -47,13 +48,14 @@ char received_state;
 
 
 
-void mfrc_print_serial(int _type);
+void mfrc_print_serial(int _type, unsigned char ch);
  //===========================RFID 데이터 형식 출력==========================//
  #define ASCII_TYPE 0
  #define DECIMAL_TYPE 1
  #define HEXDECIMAL_TYPE 2
  //===========================RFID 데이터 형식 출력==========================//
-char mfrc_check_and_data_receive(void); //여기선 카드 인식 자체의 성공 실패 여부만 체크.
+char mfrc_check_and_data_receive_ch0(void); //여기선 카드 인식 자체의 성공 실패 여부만 체크.
+char mfrc_check_and_data_receive_ch1(void); //여기선 카드 인식 자체의 성공 실패 여부만 체크.
 //esp8266에는 성공 후 무조건 단 한번만 넘기기만 하면 됨. 실패하면 안넘기면 되는거고
 
  //===========================수신 여부 리턴==========================//
@@ -98,13 +100,19 @@ int main(void)
 	//사용하는 기능들 초기화 작업
 	spi_init(_SPI_MASTER_MODE,_SPI_CLK_PRESC_16,_SPI_CLK_LO_LEADING);
 	//spi_master_tx(0x67);
-	mfrc522_init();
+	mfrc522_init(CH0);
+	_delay_ms(100);
+	mfrc522_init(CH1);
 	uart_init(0,9600);
 	uart_init(1,9600);//esp8266() : Rx:PD2, Tx:PD3
 	
-	_delay_ms(500);
-	mfrc522_version_check();
-	mfrc522_IRQ_enable();
+	_delay_ms(300);
+	mfrc522_version_check(CH0);
+	mfrc522_IRQ_enable(CH0);
+	_delay_ms(300);
+	mfrc522_version_check(CH1);
+	mfrc522_IRQ_enable(CH1);
+
 // 	byte=mfrc522_read(ComIEnReg);
 // 	mfrc522_write(ComIEnReg,byte|0x20); //RxInterrupt Enable
 // 	byte=mfrc522_read(DivIEnReg);
@@ -115,13 +123,8 @@ int main(void)
 	timer3_init();
 	sei();
 	 TICK.tick_1ms=0;
-	_delay_ms(1000);
+	_delay_ms(2500);
 	
-// 	while(TICK.buzz_1ms<1500)//전원 준비 끝날 때 까지
-// 	{//ISR에 buzz_play함수를 넣어주면 이게 필요할까 싶다?
-// 		//buzz_play();
-// 		//전원 켜지는 소리
-// 	}
 	
 
 	//main loop start.
@@ -129,12 +132,15 @@ int main(void)
     {//절대 루프 안에 delay가 길게 걸리면 않도록 주의해야 함.
 		//PORTA^=0x01;
 		
-		_delay_ms(100);
+		//_delay_ms(100);
 		//uart0_tx_string(send_SSID_TEST(SSID,PASSWORD)); //31ms나 소요됨.
 		//PORTA^=0x01;
-		
-		if(TICK.tick_1ms % 100 ==0) received_state = mfrc_check_and_data_receive(); //RFID check and receive UID data per 100ms
-		
+		static char toggle=0;
+		if((TICK.tick_1ms % 100) ==0) {
+			toggle^=0x01; //start toggling
+			if(toggle)received_state = mfrc_check_and_data_receive_ch1(); //RFID check and receive UID data per 100ms
+			else received_state = mfrc_check_and_data_receive_ch0();  //UID values are in 'rfid_uid_chX[]'
+		}
 		if(received_state==RECEIVE_NONE); //do nothing
 		else if(received_state==RECEIVE_SUCCESS){//Received data service routine.
 			//send to esp8266 and receive result data.
@@ -156,23 +162,23 @@ int main(void)
     }
 }
 
-char mfrc_check_and_data_receive(void){ 
+char mfrc_check_and_data_receive_ch0(void){ 
 	//하... 이 복병을 해결하는 방법은 detect_flag를 다른 곳에서 돌아오도록 처리해주는 방법밖에 안떠오른다. 기모띵 
 	
 	//원인 모를 버그를 해결하기 위한 용도로 쓰는 flag : 카드 인식 request 시, return 할 때 oxoxoxoxox이짓거리 하는 버그 발생	
 	static char noise_flag=0;
 	static char toggle_flag=0;
-	
+	static char _byte=0;
 	if(noise_flag==0){ //CARD_FOUND로 리턴될 떄
-		byte = mfrc522_request(PICC_REQALL,rfid_uid);
+		_byte = mfrc522_request(PICC_REQALL,rfid_uid_ch0,CH0);
 	}
 	else { //인식 성공 이후 인식(ERROR로 리턴될 때) 
 		
 		
-		if(toggle_flag) mfrc522_request(PICC_REQALL,rfid_uid); //이상한 데이터 가져올 때
+		if(toggle_flag) mfrc522_request(PICC_REQALL,rfid_uid_ch0,CH0); //이상한 데이터 가져올 때
 		else{ //정상적인 데이터 가져올 때
-			byte=mfrc522_request(PICC_REQALL,rfid_uid);
-			if(byte==ERROR) noise_flag=0;
+			_byte=mfrc522_request(PICC_REQALL,rfid_uid_ch0,CH0);
+			if(_byte==ERROR) noise_flag=0;
 		}
 			
 		toggle_flag^=0x01;
@@ -185,19 +191,18 @@ char mfrc_check_and_data_receive(void){
 	///////////////////////////////////////////////////
 	
 	
-	if(byte!=CARD_FOUND) //카드 인식이 안되어 있는 경우
+	if(_byte!=CARD_FOUND) //카드 인식이 안되어 있는 경우
 	{
-		//여기서 release해주지 말고, 타이머라던가, 문이 다시 닫혔을 때 등등 이런 경우에서 풀어주자.
-		detected_flag=NON_DETECTED;  
+		detected_flag_ch0=NON_DETECTED;  
 		return RECEIVE_NONE;
 	}
-	else if((byte==CARD_FOUND)&&(detected_flag==NON_DETECTED)) //카드를 계속 대고 있다면, 첫 순간만 인정
+	else if((_byte==CARD_FOUND)&&(detected_flag_ch0==NON_DETECTED)) //카드를 계속 대고 있다면, 첫 순간만 인정
 	{
-		detected_flag=DETECED;
+		detected_flag_ch0=DETECED;
 		noise_flag=1; //얘가 첫 순간임.
 		toggle_flag=1;
-		byte=mfrc522_get_card_serial(rfid_uid);
-		if(byte==CARD_FOUND){//카드가 인식됐을 때 
+		_byte=mfrc522_get_card_serial(rfid_uid_ch0,CH0);
+		if(_byte==CARD_FOUND){//카드가 인식됐을 때 
 			
 		/*dummy code///////////////////////////////////////*/
 // 		if(byte==CARD_FOUND)uart0_tx_char('O');
@@ -208,11 +213,11 @@ char mfrc_check_and_data_receive(void){
 			//
 			//dummy code
 			//setSoundClip(BUZZ_SUCCESS);
-// 			uart0_tx_string("[CHECK UID]: ");
-// 			mfrc_print_serial(ASCII_TYPE);
-// 			mfrc_print_serial(DECIMAL_TYPE);
-// 			mfrc_print_serial(HEXDECIMAL_TYPE);
-// 			uart0_tx_char('\n');
+			uart0_tx_string("[CHECK UID(CH0)]: ");
+			mfrc_print_serial(ASCII_TYPE,CH0);
+			mfrc_print_serial(DECIMAL_TYPE,CH0);
+			mfrc_print_serial(HEXDECIMAL_TYPE,CH0);
+			uart0_tx_char('\n');
 			//////////////////////////
 			
 			return RECEIVE_SUCCESS;
@@ -233,7 +238,53 @@ char mfrc_check_and_data_receive(void){
 
 }
 
-void mfrc_print_serial(int _type)
+char mfrc_check_and_data_receive_ch1(void){ 
+	static char noise_flag=0;
+	static char toggle_flag=0;
+	static char _byte=0;
+	if(noise_flag==0){ //CARD_FOUND로 리턴될 떄
+		_byte = mfrc522_request(PICC_REQALL,rfid_uid_ch1,CH1);
+	}
+	else { //인식 성공 이후 인식(ERROR로 리턴될 때) 
+		if(toggle_flag) mfrc522_request(PICC_REQALL,rfid_uid_ch1,CH1); //이상한 데이터 가져올 때
+		else{ //정상적인 데이터 가져올 때
+			_byte=mfrc522_request(PICC_REQALL,rfid_uid_ch1,CH1);
+			if(_byte==ERROR) noise_flag=0;
+		}
+		toggle_flag^=0x01;
+	}
+	if(_byte!=CARD_FOUND) //카드 인식이 안되어 있는 경우
+	{
+		detected_flag_ch1=NON_DETECTED;  
+		return RECEIVE_NONE;
+	}
+	else if((_byte==CARD_FOUND)&&(detected_flag_ch1==NON_DETECTED)) //카드를 계속 대고 있다면, 첫 순간만 인정
+	{
+		detected_flag_ch1=DETECED;
+		noise_flag=1; //얘가 첫 순간임.
+		toggle_flag=1;
+		_byte=mfrc522_get_card_serial(rfid_uid_ch1,CH1);
+		if(_byte==CARD_FOUND){//카드가 인식됐을 때 
+						uart0_tx_string("[CHECK UID(CH1)]: ");
+						mfrc_print_serial(ASCII_TYPE,CH1);
+						mfrc_print_serial(DECIMAL_TYPE,CH1);
+						mfrc_print_serial(HEXDECIMAL_TYPE,CH1);
+						uart0_tx_char('\n');
+
+			return RECEIVE_SUCCESS;
+		}
+		else {//카드는 인식됐지만 식별되지 않았을 때 
+				return RECEIVE_FAIL;
+		}
+	}
+	else {  //카드를 계속 대고 있을 때 (byte==CARD_FOUND && detected_flag==1)
+		return RECEIVE_NONE;
+	}
+	
+
+}
+
+void mfrc_print_serial(int _type, unsigned char ch)
 {
 	switch(_type)
 	{
@@ -242,7 +293,8 @@ void mfrc_print_serial(int _type)
 		uart0_tx_string("\n\tascii: ");
 		for(int i=0;i<4;i++){
 			//uart0_tx_string_IT(IntToString(str[i]));
-			uart0_tx_char(rfid_uid[i]);
+			if(ch==CH0)uart0_tx_char(rfid_uid_ch0[i]);
+			else uart0_tx_char(rfid_uid_ch1[i]);
 			//_delay_ms(10);
 		}
 		
@@ -253,7 +305,8 @@ void mfrc_print_serial(int _type)
 		for(int i=0;i<4;i++){
 			//uart0_tx_string_IT(IntToString(str[i]));
 			//uart0_tx_char(str[i]);
-			uart0_tx_string(IntToString(rfid_uid[i]));
+			if(ch==CH0)uart0_tx_string(IntToString(rfid_uid_ch0[i]));
+			else uart0_tx_string(IntToString(rfid_uid_ch1[i]));
 			//_delay_ms(10);
 		}
 		
@@ -265,7 +318,8 @@ void mfrc_print_serial(int _type)
 		for(int i=0;i<4;i++){
 			//uart0_tx_string_IT(IntToString(str[i]));
 			//uart0_tx_char(str[i]);
-			uart0_tx_string(HexToString(rfid_uid[i]));
+			if(ch==CH0)uart0_tx_string(HexToString(rfid_uid_ch0[i]));
+			else uart0_tx_string(HexToString(rfid_uid_ch1[i]));
 			//_delay_ms(10);
 		}
 		
@@ -281,6 +335,7 @@ void setSoundClip(char clip){
 	 {
 		 
 		   case BUZZ_MUTE: music_flag=BUZZ_MUTE; break;
+		   case BUZZ_ON: music_flag=BUZZ_ON; break;
 		   case BUZZ_SUCCESS: music_flag=BUZZ_SUCCESS; break;
 		   case BUZZ_FAIL: music_flag=BUZZ_FAIL; break;
 		   
@@ -300,6 +355,15 @@ void buzz_play(){
 	  {
 		  case BUZZ_MUTE:  buzz_MUTE(); break; //setICR3(0);. buzz_MUTE() 안에 music_flag=MUTE 넣어주는 명령 들어있음.
 		  
+		  case BUZZ_ON: 
+		   if(TICK.buzz_1ms<200)setSoundNote(Ca);
+		   else if(TICK.buzz_1ms==200) setSoundNote(E);
+		   else if(TICK.buzz_1ms==400) setSoundNote(A);
+		   else if(TICK.buzz_1ms==600) setSoundNote(BUZZ_B);
+		   else if(TICK.buzz_1ms==800) setSoundNote(BUZZ_Cs);
+		   else if(TICK.buzz_1ms==1200) buzz_MUTE();
+		   break;
+
 		  case BUZZ_SUCCESS:
 		  //TCCR3A |= (1<<COM3A0); //재생 시 타이머카운터 3번 채널 A채널 고유 핀 토글모드로 출력 설정.
 		  if(TICK.buzz_1ms<200)setSoundNote(Ca);

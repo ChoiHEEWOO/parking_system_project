@@ -30,7 +30,7 @@
 #define BUZZ_G 1250
 #define BUZZ_A 1125
 #define BUZZ_B 1021
-#define BUZZ_Cs 588
+#define BUZZ_Cs 760
 
 
 /**setSoundClip 아래 효과음 리스트 추가 요망*/
