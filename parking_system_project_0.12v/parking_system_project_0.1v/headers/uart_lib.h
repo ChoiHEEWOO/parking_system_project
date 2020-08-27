@@ -68,6 +68,6 @@ char * IntToString(int num);
 char * HexToString(char num);
 void _uart_tx_string_in_isr(void);
 
-char* send_SSID_TEST(char * ssid, char*password);
+char* send_SSID_TEST(char * cmd, char * ssid, char*password);
 
 #endif

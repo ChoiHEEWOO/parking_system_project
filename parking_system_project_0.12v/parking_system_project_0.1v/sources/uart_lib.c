@@ -129,7 +129,7 @@ char * IntToString(int num)
  {
 	 /** Dummy Function*/
 	 char buf[20];
-	 sprintf(buf,"0x%x,",num); //고유 자릿값
+	 sprintf(buf,"%x ",num); //고유 자릿값
 	 
 	 strcpy(buff.itos_buff,buf);
 	 
@@ -138,17 +138,15 @@ char * IntToString(int num)
  
  
  
-char* send_SSID_TEST(char *ssid,char*password){
+char* send_SSID_TEST(char * cmd,char *ssid,char*password){
 	//문자열 변수 ?
-	
-	char buf[50]="AT+CWJAP=\"";
+	//"AT+CWJAP=\""
+	char buf[64];
+	strcpy(buf,cmd);//"AT+CWJAP=\""
 	strcat(buf,ssid);
-	strcat(buf,"\"");
-	strcat(buf,",");
-	strcat(buf,"\"");
+	strcat(buf,"\",\"");
 	strcat(buf,password);
-	strcat(buf,"\"");
-	strcat(buf,"\r\n");
+	strcat(buf,"\"\r\n");
 	strcpy(buff.esp_buff,buf);
 	return buff.esp_buff;
 	
