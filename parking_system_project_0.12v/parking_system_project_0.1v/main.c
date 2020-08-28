@@ -33,7 +33,7 @@ typedef uint32_t u8;
 
  
  //RFID 관련.
- #define BUMMY_TEST_SERIAL 1  //if 1: dummy test, 0: no test at terminal
+ #define DUMMY_TEST_SERIAL 1  //if 1: dummy test, 0: no test at terminal
 unsigned char byte;
 unsigned char detected_flag_ch0='X';
 unsigned char detected_flag_ch1='X';
@@ -77,7 +77,8 @@ void buzz_MUTE();
 void setSoundNote(int note);
 
 void esp8266_init(unsigned char* ssid, unsigned char* pw, unsigned char * ip, unsigned char* port);
-
+volatile unsigned char esp8266_send_ready_flag=0;
+volatile unsigned char esp8266_receiving__flag=0;
 ISR(TIMER0_COMP_vect) // 1khz 속도로 ISR 진입
 {
 	//dummy code to check 
@@ -93,10 +94,25 @@ ISR(TIMER0_COMP_vect) // 1khz 속도로 ISR 진입
 
 ISR(USART1_RX_vect)
 {//esp8266으로 부터 받아오는 데이터
+	static u8 cnt=0;
+	
 	u8 buff=UDR1;
+	if(buff=='>') esp8266_send_ready_flag=1;
+	else if(buff=='}')esp8266_receiving__flag=0;
+	
+	if(esp8266_receiving__flag) {
+		esp8266_received_data[cnt]=buff;
+		cnt++;
+	}
+	else cnt=0;
+	
+	if(buff=='{')esp8266_receiving__flag=1;
+	
+	//esp8266_received_data
 	
 	//바로 터미널창에서 확인시도.
-	uart0_tx_char(buff);
+	//uart0_tx_char(buff);
+	//uart0_tx_char('*');
 	
 }
 int main(void)
@@ -112,7 +128,7 @@ int main(void)
 	mfrc522_init(CH0);
 	_delay_ms(100);
 	mfrc522_init(CH1);
-	uart_init(0,9600);
+	uart_init(0,9600); //debug channel
 	uart_init(1,9600);//esp8266() : Rx:PD2, Tx:PD3
 	
 	_delay_ms(300);
@@ -133,7 +149,9 @@ int main(void)
 	sei();
 	 TICK.tick_1ms=0;
 	_delay_ms(2500);
-	uart0_tx_string("AT\r\n");
+	
+	//dummy test
+	//uart0_tx_string("AT\r\n");
 	
 
 	//main loop start.
@@ -143,7 +161,7 @@ int main(void)
 		
 		//_delay_ms(100);
 		//uart0_tx_string(send_SSID_TEST(SSID,PASSWORD)); //31ms나 소요됨.
-		//PORTA^=0x01;
+		PORTA^=0x01;
 		static char toggle=0;
 		if((TICK.tick_1ms % 100) ==0) {
 			//toggle^=0x01; //start toggling :
@@ -160,21 +178,24 @@ int main(void)
 				//esp8266에 uid와 입구게이트 정보 전송 함수
 				//while(전송 완료될 때 까지 대기)???
 				uart1_tx_string("AT+CIPSEND=4\r\n"); //4byte길이 데이터 전송 예정
+				_delay_ms(20); //위 데이터 다 보낼때 까지 대기해야지 
 				// '>' 문자가 확인될 때까지 대기
-				//rx 완료 대기 관련 레지스터 찾아봐야함.
+				/*이부분은 esp8266 구현한 뒤에 넣어야 된다 
+				while(esp8266_send_ready_flag);//'>'문자 들어왔는지 검사
+				esp8266_send_ready_flag=0; //정상적으로 동작하는지 테스트 해봐야 함. 버그 발생한다면 이 부분도 의심해볼 필요 있음.
+				*/
 				for(int i=0; i<4; i++)
 				{
 					uart1_tx_string(HexToString(rfid_uid_ch0[i]));
+					uart1_tx_char(' ');
 				}
 				uart1_tx_string("\r\n");
+				/*이 부분은 esp8266 구현한 뒤에 넣어야 된다.
+				while(esp8266_receiving__flag); //ISR내에서 버퍼에 모두 담을때 까지 대기
+				//esp8266_receive_complete_flag=0;
+				*/
 				
-				
-				
-				
-				
-				//전송 후 
-				
-				strcpy(esp8266_received_data,"SUCCESS,CHOI HEE WOO"); //결과 데이터 저장.
+				//strcpy((char*)esp8266_received_data,"SUCCESS,CHOI HEE WOO"); //결과 데이터 저장.
 				//LCD 뷰어 및 5초 카운트 후 다시 리셋
 			}
 			else if(toggle==EXIT_GATE){
@@ -251,7 +272,7 @@ char mfrc_check_and_data_receive_ch0(void){
 			//
 			//dummy code
 			//setSoundClip(BUZZ_SUCCESS);
-			if(BUMMY_TEST_SERIAL){
+			if(DUMMY_TEST_SERIAL){
 				uart0_tx_string("[CHECK UID(CH0)]: ");
 				mfrc_print_serial(ASCII_TYPE,CH0);
 				mfrc_print_serial(DECIMAL_TYPE,CH0);
@@ -305,7 +326,7 @@ char mfrc_check_and_data_receive_ch1(void){
 		toggle_flag=1;
 		_byte=mfrc522_get_card_serial(rfid_uid_ch1,CH1);
 		if(_byte==CARD_FOUND){//카드가 인식됐을 때 
-			if(BUMMY_TEST_SERIAL){
+			if(DUMMY_TEST_SERIAL){
 						uart0_tx_string("[CHECK UID(CH1)]: ");
 						mfrc_print_serial(ASCII_TYPE,CH1);
 						mfrc_print_serial(DECIMAL_TYPE,CH1);
@@ -361,6 +382,7 @@ void mfrc_print_serial(int _type, unsigned char ch)
 			//uart0_tx_char(str[i]);
 			if(ch==CH0)uart0_tx_string(HexToString(rfid_uid_ch0[i]));
 			else uart0_tx_string(HexToString(rfid_uid_ch1[i]));
+			uart0_tx_char(' ');
 			//_delay_ms(10);
 		}
 		
@@ -376,7 +398,7 @@ void esp8266_init(unsigned char* ssid, unsigned char* pw, unsigned char * ip, un
 	uart1_tx_string("AT+RST\r\n");
 	_delay_ms(100);
 	uart1_tx_string("AT+CWMODE=3\r\n");
-	uart1_tx_string(send_SSID_TEST("AT+CWJAP=\"",ssid,pw));
+	uart1_tx_string(send_SSID_TEST("AT+CWJAP=\"",(char*)ssid,(char*)pw));
 	
 }
 

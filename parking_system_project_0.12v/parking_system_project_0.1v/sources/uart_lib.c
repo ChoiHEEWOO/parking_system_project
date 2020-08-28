@@ -129,7 +129,7 @@ char * IntToString(int num)
  {
 	 /** Dummy Function*/
 	 char buf[20];
-	 sprintf(buf,"%x ",num); //고유 자릿값
+	 sprintf(buf,"%02X",num); //고유 자릿값
 	 
 	 strcpy(buff.itos_buff,buf);
 	 

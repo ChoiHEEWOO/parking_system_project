@@ -15,6 +15,8 @@ void mfrc522_init(unsigned char ch)
 	unsigned char byte;
 	//SS핀 출력모드 및 디폴트 하이로 설정해두어야 함.
 	SS_DDR|=(0x03); // C포트 0번핀을 SS핀으로 사용
+	SS_PORT=0;
+	_delay_ms(20);
 	SS_PORT|=(0x03); //Default HIGH
 	mfrc522_reset(ch);
 	
