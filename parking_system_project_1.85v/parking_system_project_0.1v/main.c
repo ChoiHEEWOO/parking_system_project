@@ -16,7 +16,7 @@
 #define F_CPU 16000000UL
 #include <avr/io.h>
 #include <stdint.h>
-//#include "spi_lib.h"
+//#include "spi_lib.h" 
 #include "uart_lib.h"
 #include "rc522.h"//여기 안에 spi라이브러리 선언해두었음.
 #include "buzzer_cmd.h"
@@ -33,10 +33,11 @@
 #ifdef USING_MY_HOTSPOT
 	#define SSID "ChoiHW"
 	#define PASSWORD "hwhwhwhw0000"
-	#define IP "172.20.10.3" //공유기에서 할당해준 사설아이피
+	#define IP "172.20.10.4" //공유기에서 할당해준 사설아이피
 	#define PORT "23"
 #endif
 
+//팀원이 만든 가상환경에서의 서버
 #ifdef NON_USING_MY_HOTSPOT
 	#define SSID "abcde"
 	#define PASSWORD "19990305"
@@ -53,7 +54,7 @@
 //===========================RFID 입/출구==========================//
 #define ENTRANCE_GATE 0
 #define EXIT_GATE 1
-#define MAX_USER_COUNT 10
+#define MAX_USER_COUNT 5 //주차장 칸수
 //===========================RFID 입/출구==========================//
 typedef uint32_t u32;
 typedef uint8_t u8;
@@ -111,6 +112,7 @@ volatile unsigned char esp8266_send_ready_flag=0;
 volatile unsigned char esp8266_receiving_flag=0;
 volatile uint8_t esp8266_return_result_flag=0;
 volatile uint8_t receive_length=0;
+volatile int receive_length_int;
 
 
 void start_timer();
@@ -165,13 +167,17 @@ ISR(USART1_RX_vect)
 	else if(buff==','&&parse_cnt==4)parse_cnt++;	
 	else if(parse_cnt==5)// 자리수가 일의 자리로 들어왔을 때
 	{
-		receive_length=buff; parse_cnt++; 
+		receive_length=buff; parse_cnt++; //
+		char buf_1[2]= {receive_length,0};
+		receive_length_int=atoi((char*)buf_1);
+		memset(buf_1,0,sizeof(buf_1));
+
 	}
 	else if(parse_cnt==6&&buff!=':') // :가 들어오지 않고 10의 자리 숫자의 길이가 들어왔을 때
 	{
-		char buf[3]={receive_length,buff,0};
-		receive_length = atoi((char*)buf);
-		memset(buf,0,sizeof(buf));
+		char buf_2[3]={receive_length,buff,0};
+		receive_length_int = atoi((char*)buf_2);
+		memset(buf_2,0,sizeof(buf_2));
 	}
 	else if(parse_cnt==6) //:가 들어왔을 때 
 	{
@@ -181,7 +187,7 @@ ISR(USART1_RX_vect)
 	else if(parse_data_flag){ //길이가 4인 데이터
 		esp8266_received_data[data_cnt]=buff;
 		data_cnt++;
-		if(data_cnt==receive_length) {esp8266_receiving_flag=1; parse_data_flag=0; }
+		if(data_cnt==receive_length_int) {esp8266_receiving_flag=1; parse_data_flag=0; }
 	}
 	else parse_cnt=0;
 	
@@ -249,7 +255,7 @@ int main(void)
 	//main loop start.
 	_delay_ms(2000);
 	i2c_lcd_clear();
-    _delay_ms(1000);
+    _delay_ms(10);
 	i2c_lcd_noBacklight();
 	
 	while (1) 
@@ -300,16 +306,18 @@ int main(void)
 				}
 				uart1_tx_string("\r\n");
 
-
+				//uart0_tx_string("\nline:304\n");
 				/*이 부분은 esp8266 구현한 뒤에 넣어야 된다.*/
 				//전송 후, 서버에서 결과물을 다시 전송해주기까지 대기
 				while(!esp8266_receiving_flag); //ISR내에서 버퍼에 모두 담을때 까지 대기 esp8266_received_data[] 에 저장
 				esp8266_receiving_flag=0;
+				//uart0_tx_string("\nline:309\n");
 				//esp8266_receive_complete_flag=0;
 				if(esp8266_received_data[0]=='O'){
 					//DB 테이블에 존재하는 uid일 경우 해당 구문을 무조건 돌음
-					
+					//uart0_tx_string("\nline:313\n");
 					logojector_ON();
+					start_timer(); //ticktim을 0으로 클리어시킴.
 					//현재 입장객 버퍼 비어있는 인덱스 체크
 					rfid_user_flag=0;
 					for(int i=0; i<MAX_USER_COUNT;i++)
@@ -331,25 +339,28 @@ int main(void)
 						//else rfid_user_flag=0;//모두 꽉 차 있음. 
 						
 					}
+					//uart0_tx_string("\nline:336\n");
 					if(rfid_user_flag){//DB에 uid가 존재할뿐더러, 최초 입장시에만 해당 구문을 들어감. 이후에는 인식안됨.
 						strcpy((char*)rfid_user_uid_buffer[rfid_user_count_pointer],(char*)rfid_uid_ch0); 
 						//LCD ON
 				
 						
-						start_timer(); //ticktim을 0으로 클리어시킴.
+						//start_timer(); //ticktim을 0으로 클리어시킴.
 						
-						
+						//uart0_tx_string("\nline:344\n");
 						i2c_lcd_clear();
-						_delay_ms(10);
+						_delay_ms(20);
 						i2c_lcd_string(0,0,"Welcome,");
 						i2c_lcd_string(1,2,(char*)esp8266_received_data);
+						//uart0_tx_string("\nline:351\n");
 						i2c_lcd_string(2,0,"Empty Space=[00 /42]");
 						i2c_lcd_string(2,13,"40");
 						setSoundClip(BUZZ_SUCCESS);
+						//uart0_tx_string("\nline:355\n");
 					}
 					else {//한 번 초과로 인식시켰을 때 지나는 구문
 						i2c_lcd_clear();
-						_delay_ms(10);
+						_delay_ms(20);
 						i2c_lcd_string(0,0,"Welcome,");
 						i2c_lcd_string(1,2,(char*)esp8266_received_data);
 						i2c_lcd_string(2,0,"Already Recognized");
@@ -449,11 +460,11 @@ int main(void)
 				setSoundClip(BUZZ_FAIL);
 				
 			}
-			else if(TICK.tick_1ms==8000){//10초
+			else if(TICK.tick_1ms==10000){//10초
 				//10초가 지나면 화면 클리어시키고, 백라이트 꺼줌
 				i2c_lcd_noBacklight();
 			}
-			else if(TICK.tick_1ms==10000)
+			else if(TICK.tick_1ms==12000)
 			{
 				//로고젝터 오프 
 				logojector_OFF();
@@ -598,6 +609,7 @@ void rfid_user_uid_buffer_init(void)
 {
 	for(int i=0; i<MAX_USER_COUNT;i++)
 	{
+		
 		strcpy((char*)rfid_user_uid_buffer[i],"0000");
 	}
 	i2c_lcd_string(2,0,"     OOOOOOOOOO     ");
