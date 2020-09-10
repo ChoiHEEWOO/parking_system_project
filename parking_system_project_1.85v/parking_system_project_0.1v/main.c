@@ -79,7 +79,6 @@ char received_state;
 uint8_t rfid_user_uid_buffer[MAX_USER_COUNT][5]={0,}; //최대 MAX_USER_COUNT명까지 입장여부 기억
 int rfid_user_count_pointer=0;	
 int rfid_user_flag=0;
-	
 uint8_t esp8266_received_data[50];
 
 
@@ -95,7 +94,8 @@ char mfrc_check_and_data_receive_ch0(void); //여기선 카드 인식 자체의 
 char mfrc_check_and_data_receive_ch1(void); //여기선 카드 인식 자체의 성공 실패 여부만 체크.
 //esp8266에는 성공 후 무조건 단 한번만 넘기기만 하면 됨. 실패하면 안넘기면 되는거고
 void rfid_user_uid_buffer_init(void);
-
+void RC522_data_request_per_100ms(char* tggl);
+void RC522_data_state_check_and_actuate(char *tggl);
  //===========================수신 여부 리턴==========================//
  #define RECEIVE_NONE 0
  #define RECEIVE_SUCCESS 1
@@ -249,208 +249,27 @@ int main(void)
 	
 		i2c_lcd_string(0,0,"====================");
 		i2c_lcd_string(1,0," Firmware Ver 1.85  ");
-		i2c_lcd_string(2,0,"     Welcome :^)    ");
+		i2c_lcd_string(2,0,"     Welcome        ");
 		i2c_lcd_string(3,0,"====================");
 	setSoundClip(BUZZ_ESP8266_CONNECTED);
 	//main loop start.
 	_delay_ms(2000);
 	i2c_lcd_clear();
-    _delay_ms(10);
 	i2c_lcd_noBacklight();
+	
 	
 	while (1) 
     {//가급적 루프 안에 delay가 길게 걸리면 않도록 주의해야 함.
+		
+		//dummy code
 		//PORTA^=0x01;
 		
-		//_delay_ms(100);
-		//uart0_tx_string(send_SSID_TEST(SSID,PASSWORD)); //31ms나 소요됨.
-		//PORTA^=0x01;
 		static char toggle=0;
-		
 		//every 100ms, return RFID Reader state
-		if((TICK.tick_1ms % 100) ==0) {
-			
-				//toggle = 0 : entrance gate
-				//toggle = 1 : exit gate
-			toggle^=0x01; //start toggling :
+		RC522_data_request_per_100ms(&toggle);
+		RC522_data_state_check_and_actuate(&toggle);
 		
-			if(toggle==0){
-				received_state = mfrc_check_and_data_receive_ch0();
-				rfid_uid_ch0[4]=0; //문자 끝에 null을 넣어주기 위함. "abcd" 
-			}//RFID check and receive UID data per 100ms
-			else {
-				received_state = mfrc_check_and_data_receive_ch1();  //UID values are in 'rfid_uid_chX[]'
-				rfid_uid_ch1[4]=0;
-			}
-		}
-		if(received_state==RECEIVE_NONE); //do nothing
-		else if(received_state==RECEIVE_SUCCESS){//Received data service routine.
-			//send to esp8266 and receive result data.
-			if(toggle==ENTRANCE_GATE){
-				//esp8266에 uid와 입구게이트 정보 전송 함수
-				//while(전송 완료될 때 까지 대기)???
-				
-				
-				/*이부분은 esp8266 구현한 뒤에 넣어야 된다 */
-				uart1_tx_string("AT+CIPSEND=11\r\n"); //4byte길이 데이터 전송 예정
-				//_delay_ms(20); //위 데이터 다 보낼때 까지 대기해야 하는데, 사실 없어도 되는 라인
-				// '>' 문자가 확인될 때까지 대기
-				while(!esp8266_send_ready_flag);//'>'문자 들어왔는지 검사
-				esp8266_send_ready_flag=0;
-				 
-				//esp8266으로 uid데이터 전송
-				for(int i=0; i<4; i++)
-				{
-					uart1_tx_string(HexToString(rfid_uid_ch0[i]));
-					uart1_tx_char(' ');
-				}
-				uart1_tx_string("\r\n");
-
-				//uart0_tx_string("\nline:304\n");
-				/*이 부분은 esp8266 구현한 뒤에 넣어야 된다.*/
-				//전송 후, 서버에서 결과물을 다시 전송해주기까지 대기
-				while(!esp8266_receiving_flag); //ISR내에서 버퍼에 모두 담을때 까지 대기 esp8266_received_data[] 에 저장
-				esp8266_receiving_flag=0;
-				//uart0_tx_string("\nline:309\n");
-				//esp8266_receive_complete_flag=0;
-				if(esp8266_received_data[0]=='O'){
-					//DB 테이블에 존재하는 uid일 경우 해당 구문을 무조건 돌음
-					//uart0_tx_string("\nline:313\n");
-					logojector_ON();
-					start_timer(); //ticktim을 0으로 클리어시킴.
-					//현재 입장객 버퍼 비어있는 인덱스 체크
-					rfid_user_flag=0;
-					for(int i=0; i<MAX_USER_COUNT;i++)
-					{
-						
-						//인덱스를 모두 체크해줘서 한번 인식이 유저의 경우
-						// 다시 카드 인식시키지 않도록 구현
-						
-						if(strcmp((char*)rfid_user_uid_buffer[i],"0000")==0){
-							//해당 위치의 버퍼가 비어있는 것이 확인된다면
-							rfid_user_count_pointer=i;
-							rfid_user_flag=1;
-							//i=MAX_USER_COUNT;//루프를 나오기 위함
-						}else if(strcmp((char*)rfid_user_uid_buffer[i],(char*)rfid_uid_ch0)==0){ 
-							//만일 버퍼 안에 기존 유저가 들어있다면
-							i=MAX_USER_COUNT; //그 이후는 의미 없기 때문에 그냥 빠져나옴
-							rfid_user_flag=0;
-						}
-						//else rfid_user_flag=0;//모두 꽉 차 있음. 
-						
-					}
-					//uart0_tx_string("\nline:336\n");
-					if(rfid_user_flag){//DB에 uid가 존재할뿐더러, 최초 입장시에만 해당 구문을 들어감. 이후에는 인식안됨.
-						strcpy((char*)rfid_user_uid_buffer[rfid_user_count_pointer],(char*)rfid_uid_ch0); 
-						//LCD ON
-				
-						
-						//start_timer(); //ticktim을 0으로 클리어시킴.
-						
-						//uart0_tx_string("\nline:344\n");
-						i2c_lcd_clear();
-						_delay_ms(20);
-						i2c_lcd_string(0,0,"Welcome,");
-						i2c_lcd_string(1,2,(char*)esp8266_received_data);
-						//uart0_tx_string("\nline:351\n");
-						i2c_lcd_string(2,0,"Empty Space=[00 /42]");
-						i2c_lcd_string(2,13,"40");
-						setSoundClip(BUZZ_SUCCESS);
-						//uart0_tx_string("\nline:355\n");
-					}
-					else {//한 번 초과로 인식시켰을 때 지나는 구문
-						i2c_lcd_clear();
-						_delay_ms(20);
-						i2c_lcd_string(0,0,"Welcome,");
-						i2c_lcd_string(1,2,(char*)esp8266_received_data);
-						i2c_lcd_string(2,0,"Already Recognized");
-						
-					}
-				}//if(esp8266_received_data[0]=='O') end
-				else if(esp8266_received_data[0]!='O') setSoundClip(BUZZ_FAIL);
-				
-				_delay_ms(20);
-				//dummy test code (서버로부터 결과 값 수신 결과 확인)
-				uart0_tx_char('\n');
-				uart0_tx_string("From server : ");
-				uart0_tx_string((char*)esp8266_received_data);
-				uart0_tx_char('\n');
-				
-				//dummy test code (이용객 저장 버퍼 상태 표시)
-				for(int i=0;i<MAX_USER_COUNT;i++){
-					uart0_tx_char('[');
-					//uart0_tx_string((char*)rfid_user_uid_buffer[i]);
-					for(int j=0;j<4;j++){
-						uart0_tx_string(HexToString(rfid_user_uid_buffer[i][j]));
-						if(j!=3)uart0_tx_char(' ');
-						//_delay_ms(10);
-					}
-					
-					
-					uart0_tx_char(']');
-					uart0_tx_char('\n');
-				}
-				
-				//_delay_ms(100);
-				
-				//strcpy((char*)esp8266_received_data,"SUCCESS,CHOI HEE WOO"); //결과 데이터 저장.
-				
-				
-				
-				//LCD 뷰어 및 5초 카운트 후 다시 리셋
-				
-			}//if(toggle==ENTRANCE_GATE) end
-			
-			else if(toggle==EXIT_GATE){
-				//esp8266에 uid와 출구게이트 정보 전송 함수		
-				//구현안하기로 함	
-				// 구현해둬야 함. ==> 사람들 나가는 것 정도는 확인할 필요가 있음.
-				
-				
-				//흠.... 등록되어있는사람일 경우에 무조건 열어주는방식으로 할까		: esp8266으로부터 데이터 받은 뒤에 그냥 열어줌
-				//입장한 사람에 한정해서만 나갈 수 있도록 제한하는 방식으로 할까		:  >> 이게 타당하다 :
-				for(int i=0; i<MAX_USER_COUNT;i++)
-				{
-					if(strcmp((char*)rfid_user_uid_buffer[i],(char*)rfid_uid_ch1)==0){//출구에서 찍은 카드가 이용객 버퍼에 존재한다면
-						strcpy((char*)rfid_user_uid_buffer[i],"0000");
-						//절대 버퍼에는 중복되는 값이 들어가지 않도록 코드가 작성되어 있기 때문에 여기다가 명령구문을 넣어도 될듯
-						start_timer(); //ticktim을 0으로 클리어시킴. 
-						setSoundClip(BUZZ_SUCCESS);
-					}//그곳 버퍼를 비움
-					
-				}
-				//dummy test code
-				for(int i=0;i<MAX_USER_COUNT;i++){
-					
-					uart0_tx_char('[');
-					//uart0_tx_string((char*)rfid_user_uid_buffer[i]);
-					for(int j=0;j<4;j++){
-						uart0_tx_string(HexToString(rfid_user_uid_buffer[i][j]));
-						if(j!=3)uart0_tx_char(' ');
-						//_delay_ms(10);
-					}
-					uart0_tx_char(']');
-					uart0_tx_char('\n');
-					
-				}
-				//마찬가지로 액추에이터 동작시킴
-					
-			}
-					
-			
-		}
-		//RFID 데이터가 정상적으로 인식되지 않았을 때
-		else if(received_state==RECEIVE_FAIL){
-			setSoundClip(BUZZ_FAIL);
-			i2c_lcd_clear();
-			_delay_ms(10);
-			//i2c_lcd_string(0,0,"Welcome,")
-			//i2c_lcd_string(1,2,esp8266_received_data);
-			i2c_lcd_string(2,0,"Plz, Re-tagging. ");
-			
-		}
 		
-		received_state=RECEIVE_NONE;
 		
 		if(start_timer_flag==1)
 		{
@@ -605,6 +424,195 @@ char mfrc_check_and_data_receive_ch1(void){
 
 }
 
+
+void RC522_data_request_per_100ms(char* tggl){
+	
+	if((TICK.tick_1ms % 100) ==0) {
+		
+		//toggle = 0 : entrance gate
+		//toggle = 1 : exit gate
+		(*tggl)^=0x01; //start toggling :
+		
+		if((*tggl)==0){
+			received_state = mfrc_check_and_data_receive_ch0();
+			rfid_uid_ch0[4]=0; //배열을 문자열처럼 사용하기 위해 (문자 끝에 null을 넣어주기 위함. "abcd")
+		}//RFID check and receive UID data per 100ms
+		else {
+			received_state = mfrc_check_and_data_receive_ch1();  //UID values are in 'rfid_uid_chX[]'
+			rfid_uid_ch1[4]=0;
+		}
+	}
+}
+
+void RC522_data_state_check_and_actuate(char *tggl)
+{
+	if(received_state==RECEIVE_NONE); //do nothing
+	else if(received_state==RECEIVE_SUCCESS){//Received data service routine.
+		//send to esp8266 and receive result data.
+		if((*tggl)==ENTRANCE_GATE){
+			//esp8266에 uid와 입구게이트 정보 전송 함수
+			//while(전송 완료될 때 까지 대기)???
+			
+			
+			/*이부분은 esp8266 구현한 뒤에 넣어야 된다 */
+			uart1_tx_string("AT+CIPSEND=11\r\n"); //4byte길이 데이터 전송 예정
+			//_delay_ms(20); //위 데이터 다 보낼때 까지 대기해야 하는데, 사실 없어도 되는 라인
+			// '>' 문자가 확인될 때까지 대기
+			while(!esp8266_send_ready_flag);//'>'문자 들어왔는지 검사
+			esp8266_send_ready_flag=0;
+			
+			//esp8266으로 uid데이터 전송
+			for(int i=0; i<4; i++)
+			{
+				uart1_tx_string(HexToString(rfid_uid_ch0[i]));
+				uart1_tx_char(' ');
+			}
+			uart1_tx_string("\r\n");
+
+			//uart0_tx_string("\nline:304\n");
+			/*이 부분은 esp8266 구현한 뒤에 넣어야 된다.*/
+			//전송 후, 서버에서 결과물을 다시 전송해주기까지 대기
+			while(!esp8266_receiving_flag); //ISR내에서 버퍼에 모두 담을때 까지 대기 esp8266_received_data[] 에 저장
+			esp8266_receiving_flag=0;
+			//uart0_tx_string("\nline:309\n");
+			//esp8266_receive_complete_flag=0;
+			if(esp8266_received_data[0]=='O'){
+				//DB 테이블에 존재하는 uid일 경우 해당 구문을 무조건 돌음
+				//uart0_tx_string("\nline:313\n");
+				logojector_ON();
+				start_timer(); //ticktim을 0으로 클리어시킴.
+				//현재 입장객 버퍼 비어있는 인덱스 체크
+				rfid_user_flag=0;
+				for(int i=0; i<MAX_USER_COUNT;i++)
+				{
+					
+					//인덱스를 모두 체크해줘서 한번 인식이 유저의 경우
+					// 다시 카드 인식시키지 않도록 구현
+					
+					if(strcmp((char*)rfid_user_uid_buffer[i],"0000")==0){
+						//해당 위치의 버퍼가 비어있는 것이 확인된다면
+						rfid_user_count_pointer=i;
+						rfid_user_flag=1;
+						//i=MAX_USER_COUNT;//루프를 나오기 위함
+						}else if(strcmp((char*)rfid_user_uid_buffer[i],(char*)rfid_uid_ch0)==0){
+						//만일 버퍼 안에 기존 유저가 들어있다면
+						i=MAX_USER_COUNT; //그 이후는 의미 없기 때문에 그냥 빠져나옴
+						rfid_user_flag=0;
+					}
+					//else rfid_user_flag=0;//모두 꽉 차 있음.
+					
+				}
+				//uart0_tx_string("\nline:336\n");
+				if(rfid_user_flag){//DB에 uid가 존재할뿐더러, 최초 입장시에만 해당 구문을 들어감. 이후에는 인식안됨.
+					strcpy((char*)rfid_user_uid_buffer[rfid_user_count_pointer],(char*)rfid_uid_ch0);
+					//LCD ON
+					
+					
+					//start_timer(); //ticktim을 0으로 클리어시킴.
+					
+					//uart0_tx_string("\nline:344\n");
+					i2c_lcd_clear();
+					i2c_lcd_string(0,0,"Welcome,");
+					i2c_lcd_string(1,2,(char*)esp8266_received_data);
+					i2c_lcd_string(2,0,"Empty Space=[00 /42]");
+					i2c_lcd_string(2,13,"40");
+					setSoundClip(BUZZ_SUCCESS);
+				}
+				else {//한 번 초과로 인식시켰을 때 지나는 구문
+					i2c_lcd_clear();
+					i2c_lcd_string(0,0,"Welcome,");
+					i2c_lcd_string(1,2,(char*)esp8266_received_data);
+					i2c_lcd_string(2,0,"Already Recognized");
+					
+				}
+			}//if(esp8266_received_data[0]=='O') end
+			else if(esp8266_received_data[0]!='O') setSoundClip(BUZZ_FAIL);
+			
+			_delay_ms(20);
+			//dummy test code (서버로부터 결과 값 수신 결과 확인)
+			uart0_tx_char('\n');
+			uart0_tx_string("From server : ");
+			uart0_tx_string((char*)esp8266_received_data);
+			uart0_tx_char('\n');
+			
+			//dummy test code (이용객 저장 버퍼 상태 표시)
+			for(int i=0;i<MAX_USER_COUNT;i++){
+				uart0_tx_char('[');
+				//uart0_tx_string((char*)rfid_user_uid_buffer[i]);
+				for(int j=0;j<4;j++){
+					uart0_tx_string(HexToString(rfid_user_uid_buffer[i][j]));
+					if(j!=3)uart0_tx_char(' ');
+					//_delay_ms(10);
+				}
+				
+				
+				uart0_tx_char(']');
+				uart0_tx_char('\n');
+			}
+			
+			//_delay_ms(100);
+			
+			//strcpy((char*)esp8266_received_data,"SUCCESS,CHOI HEE WOO"); //결과 데이터 저장.
+			
+			
+			
+			//LCD 뷰어 및 5초 카운트 후 다시 리셋
+			
+		}//if(toggle==ENTRANCE_GATE) end
+		
+		else if((*tggl)==EXIT_GATE){
+			//esp8266에 uid와 출구게이트 정보 전송 함수
+			//구현안하기로 함
+			// 구현해둬야 함. ==> 사람들 나가는 것 정도는 확인할 필요가 있음.
+			
+			
+			//흠.... 등록되어있는사람일 경우에 무조건 열어주는방식으로 할까		: esp8266으로부터 데이터 받은 뒤에 그냥 열어줌
+			//입장한 사람에 한정해서만 나갈 수 있도록 제한하는 방식으로 할까		:  >> 이게 타당하다 :
+			for(int i=0; i<MAX_USER_COUNT;i++)
+			{
+				if(strcmp((char*)rfid_user_uid_buffer[i],(char*)rfid_uid_ch1)==0){//출구에서 찍은 카드가 이용객 버퍼에 존재한다면
+					strcpy((char*)rfid_user_uid_buffer[i],"0000");
+					//절대 버퍼에는 중복되는 값이 들어가지 않도록 코드가 작성되어 있기 때문에 여기다가 명령구문을 넣어도 될듯
+					start_timer(); //ticktim을 0으로 클리어시킴.
+					setSoundClip(BUZZ_SUCCESS);
+				}//그곳 버퍼를 비움
+				
+			}
+			//dummy test code
+			for(int i=0;i<MAX_USER_COUNT;i++){
+				
+				uart0_tx_char('[');
+				//uart0_tx_string((char*)rfid_user_uid_buffer[i]);
+				for(int j=0;j<4;j++){
+					uart0_tx_string(HexToString(rfid_user_uid_buffer[i][j]));
+					if(j!=3)uart0_tx_char(' ');
+					//_delay_ms(10);
+				}
+				uart0_tx_char(']');
+				uart0_tx_char('\n');
+				
+			}
+			//마찬가지로 액추에이터 동작시킴
+			
+		}
+		
+		
+	}
+	//RFID 데이터가 정상적으로 인식되지 않았을 때
+	else if(received_state==RECEIVE_FAIL){
+		setSoundClip(BUZZ_FAIL);
+		i2c_lcd_clear();
+		
+		//i2c_lcd_string(0,0,"Welcome,")
+		//i2c_lcd_string(1,2,esp8266_received_data);
+		i2c_lcd_string(2,0,"Plz, Re-tagging. ");
+		
+	}
+	
+	received_state=RECEIVE_NONE;
+}
+
+
 void rfid_user_uid_buffer_init(void)
 {
 	for(int i=0; i<MAX_USER_COUNT;i++)
@@ -721,8 +729,10 @@ void setSoundClip(char clip){
 		   case BUZZ_MUTE: music_flag=BUZZ_MUTE; break;
 		   case BUZZ_ON: music_flag=BUZZ_ON; break;
 		   case BUZZ_SUCCESS: music_flag=BUZZ_SUCCESS; break;
+		   case BUZZ_UNENROLLED: music_flag=BUZZ_UNENROLLED; break;
 		   case BUZZ_FAIL: music_flag=BUZZ_FAIL; break;
 		   case BUZZ_ESP8266_CONNECTED: music_flag=BUZZ_ESP8266_CONNECTED; break;
+		   
 	 }
 	 TICK.buzz_1ms=0;
 }
@@ -752,7 +762,15 @@ void buzz_play(){
 		  else if(TICK.buzz_1ms==430) setSoundNote(A);
 		  else if(TICK.buzz_1ms==600) buzz_MUTE();
 		  break;
-		  
+		  case BUZZ_UNENROLLED:
+		  		  if(TICK.buzz_1ms<75)setSoundNote(_960Hz);
+		  		  else if(TICK.buzz_1ms<150)setSoundNote(BUZZ_MUTE);
+		  		  else if(TICK.buzz_1ms<225)setSoundNote(_960Hz);
+		  		  else if(TICK.buzz_1ms<300)setSoundNote(BUZZ_MUTE);
+		  		  else if(TICK.buzz_1ms<375)setSoundNote(_960Hz);
+		  		  else if(TICK.buzz_1ms==450) buzz_MUTE(); //buzz_MUTE();
+		  		  break;
+		  break;
 		  case BUZZ_FAIL:
 		  if(TICK.buzz_1ms<100)setSoundNote(_960Hz);
 		  else if(TICK.buzz_1ms<200)setSoundNote(BUZZ_MUTE);

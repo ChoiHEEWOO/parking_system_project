@@ -125,13 +125,15 @@
 
 
 
+//정적 함수로 사용하기 위해 h에서 원형을 나타내지 않음. 
+// ==> 이렇게 해줌으로써, 다른 소스파일에서는 사용하지 못하는 함수를 만들었다.
+//static void mfrc522_write(unsigned char reg, unsigned char value,unsigned char channel);
+//static unsigned char mfrc522_read(unsigned char reg, unsigned char channel);
+//static void mfrc522_reset(unsigned char ch);
+//static unsigned char mfrc522_to_card(unsigned char cmd, unsigned char *send_data, unsigned char send_data_len, unsigned char *back_data, uint32_t *back_data_len,unsigned char ch);
 
-void mfrc522_init(unsigned char ch);
-void mfrc522_write(unsigned char reg, unsigned char value,unsigned char channel);
-unsigned char mfrc522_read(unsigned char reg, unsigned char channel);
-void mfrc522_reset(unsigned char ch);
-void mfrc522_version_check(unsigned char ch);
-void mfrc522_IRQ_enable(unsigned char ch);
-unsigned char mfrc522_request(unsigned char req_mode, unsigned char * tag_type,unsigned char ch);
-unsigned char mfrc522_to_card(unsigned char cmd, unsigned char *send_data, unsigned char send_data_len, unsigned char *back_data, uint32_t *back_data_len,unsigned char ch);
-unsigned char mfrc522_get_card_serial(unsigned char * serial_out,unsigned char ch);
+extern void mfrc522_init(unsigned char ch);
+extern void mfrc522_version_check(unsigned char ch);
+extern void mfrc522_IRQ_enable(unsigned char ch);
+extern unsigned char mfrc522_request(unsigned char req_mode, unsigned char * tag_type,unsigned char ch);
+extern unsigned char mfrc522_get_card_serial(unsigned char * serial_out,unsigned char ch);

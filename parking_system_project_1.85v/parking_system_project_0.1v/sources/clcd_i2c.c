@@ -47,6 +47,7 @@ void i2c_lcd_noBacklight(void)
 	c_buf[3] = ((0x01<<4)&0xF0) | RS0_EN0 | 0;
 	
 	while(i2c_transmit(I2C_addr_PCF8574, c_buf, 4));
+	_delay_ms(10);
 }
 
 void i2c_lcd_setBacklight(uint8_t light)
@@ -66,6 +67,7 @@ void i2c_lcd_setBacklight(uint8_t light)
 			
 			while(i2c_transmit(I2C_addr_PCF8574, c_buf, 2));
 	}
+	_delay_ms(10);
 }
 void i2c_lcd_command_8(uint8_t command)
 {
@@ -131,4 +133,6 @@ void i2c_lcd_clear()
 		c_buf[3] = ((0x01<<4)&0xF0) | RS0_EN0 | BackLight;
 		
 		while(i2c_transmit(I2C_addr_PCF8574, c_buf, 4));
+		
+		_delay_ms(10);
 }

@@ -38,8 +38,9 @@
 #define BUZZ_MUTE 0x00 //
 #define BUZZ_ON 0x01
 #define BUZZ_SUCCESS 0x02
-#define BUZZ_FAIL 0x03 //인식 실패 시 :: 삐~~-삐~~-삐~~
-#define BUZZ_ESP8266_CONNECTED 0x04
+#define BUZZ_UNENROLLED 0x03
+#define BUZZ_FAIL 0x04 //인식 실패 시 :: 삐~~-삐~~-삐~~
+#define BUZZ_ESP8266_CONNECTED 0x05
 // #define BUZZ_BEEP 0x01 //인식 시 삐빕
 // #define BUZZ_POWERON 0x03 //처음 전원 인가 후 로딩 중
 // #define BUZZ_DOOR_OPEN 0x04 //인식 후 문 열 때 효과음
