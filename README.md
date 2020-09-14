@@ -3,7 +3,7 @@
 
 parking system, RFID, server, DB, etc...
 
-#릴레이스위치
+# 릴레이스위치
 
 
 # 현재 진행 상황
