@@ -33,7 +33,7 @@
 #ifdef USING_MY_HOTSPOT
 	#define SSID "ChoiHW"
 	#define PASSWORD "hwhwhwhw0000"
-	#define IP "172.20.10.4" //공유기에서 할당해준 사설아이피
+	#define IP "172.20.10.3" //공유기에서 할당해준 사설아이피
 	#define PORT "23"
 #endif
 
@@ -132,6 +132,7 @@ void start_timeout_count();
 
 void timeout_check(char* state);
 void request_reset_to_admin(char* state);
+
 void logojector_ON();
 void logojector_OFF();
 
@@ -230,7 +231,8 @@ int main(void)
 		RC522_data_state_check_and_actuate(&toggle);
 		if(start_timer_flag==1)
 		{
-			if(TICK.tick_1ms==5000)//5초
+			
+			if(TICK.tick_1ms==7000)//5초
 			{
 				//문을 닫아주는 동시에 백라이트 꺼줌
 				setSoundClip(BUZZ_FAIL);
@@ -240,7 +242,7 @@ int main(void)
 				//10초가 지나면 화면 클리어시키고, 백라이트 꺼줌
 				i2c_lcd_noBacklight();
 			}
-			else if(TICK.tick_1ms==12000)
+			else if(TICK.tick_1ms>12000)
 			{
 				//로고젝터 오프 
 				logojector_OFF();
@@ -259,10 +261,10 @@ int main(void)
 void systems_init(void){
 	sei();
 	//DDRA|=0x03; //test Port
-	//7번비트	: 릴레이스위치
 	//0~3번비트	: 스테핑모터 제어
-	DDRA=0x8f;
-	
+	DDRA=0x0f;
+	//4번비트	: 릴레이스위치
+	DDRC |= (1<<4);
 	cli(); //전역 인터럽트 해제
 	
 	timer0_init();
@@ -472,6 +474,9 @@ void RC522_data_state_check_and_actuate(char *tggl)
 			esp8266_send_ready_flag=0;
 			
 			//esp8266으로 uid데이터 전송
+			
+			//미리 받을 준비 시작
+			memset(esp8266_received_data,0,sizeof(esp8266_received_data)); 
 			for(int i=0; i<4; i++)
 			{
 				uart1_tx_string(HexToString(rfid_uid_ch0[i]));
@@ -489,8 +494,8 @@ void RC522_data_state_check_and_actuate(char *tggl)
 			if(esp8266_received_data[0]=='O'){
 				//DB 테이블에 존재하는 uid일 경우 해당 구문을 무조건 돌음
 				//uart0_tx_string("\nline:313\n");
-				logojector_ON();
 				start_timer(); //ticktim을 0으로 클리어시킴.
+				logojector_ON();
 				//현재 입장객 버퍼 비어있는 인덱스 체크
 				rfid_user_flag=0;
 				for(int i=0; i<MAX_USER_COUNT;i++)
@@ -881,8 +886,8 @@ void request_reset_to_admin(char* state)
 }
 
 void logojector_ON(void){
-	PORTA|=0x80;	
+	PORTC|=(1<<4);
 }
 void logojector_OFF(void){
-	PORTA&=~(0x80);
+	PORTC&=~(1<<4);
 }
