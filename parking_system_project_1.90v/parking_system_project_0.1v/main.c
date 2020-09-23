@@ -25,8 +25,8 @@
 #include "timer_lib.h"
 #include "clcd_i2c.h"
 
-#define USING_MY_HOTSPOT
-//#define NON_USING_MY_HOTSPOT
+//#define USING_MY_HOTSPOT
+#define NON_USING_MY_HOTSPOT
 
 
 //본인 핸드폰 핫스팟 환경일 때
@@ -300,9 +300,11 @@ void systems_init(void){
 	esp8266_init((unsigned char*)SSID,(unsigned char*)PASSWORD,(unsigned char*)IP,(unsigned char*)PORT);
 	rfid_user_uid_buffer_init();
 	
+	char version_buf[20] = " Firmware Ver ";
+	strcat(version_buf,(const char*)FIRMWARE_VERSION);
 	i2c_lcd_string(0,0,"====================");
 	i2c_lcd_string(1,0,"  Parking System    ");
-	i2c_lcd_string(2,0," Firmware Ver 1.90  ");
+	i2c_lcd_string(2,0,version_buf);
 	i2c_lcd_string(3,0,"====================");
 	setSoundClip(BUZZ_ESP8266_CONNECTED);
 	//main loop start.
@@ -543,7 +545,7 @@ void RC522_data_state_check_and_actuate(char *tggl)
 			}//if(esp8266_received_data[0]=='O') end
 			else if(esp8266_received_data[0]!='O') setSoundClip(BUZZ_FAIL);
 			
-			_delay_ms(20);
+			//_delay_ms(20);
 			//dummy test code (서버로부터 결과 값 수신 결과 확인)
 			uart0_tx_char('\n');
 			uart0_tx_string("From server : ");
